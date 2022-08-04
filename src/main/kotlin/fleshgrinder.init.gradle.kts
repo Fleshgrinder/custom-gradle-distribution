@@ -72,6 +72,8 @@ fun ScriptHandler.configure() {
 
 beforeSettings {
     buildscript.configure()
+    pluginManagement.repositories.configure()
+    dependencyResolutionManagement.repositories.configure()
 
     try {
         val javaVersion = settingsDir.resolve(".java-version").readText().trim().removePrefix("1.")
@@ -83,7 +85,7 @@ beforeSettings {
 
 beforeProject {
     buildscript.configure()
-    repositories.configure()
+    dependencyLocking.lockAllConfigurations()
 
     tasks.apply {
         withType<AbstractArchiveTask>().configureEach {
