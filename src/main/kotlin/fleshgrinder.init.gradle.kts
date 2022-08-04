@@ -76,10 +76,16 @@ beforeSettings {
     dependencyResolutionManagement.repositories.configure()
 
     try {
-        val javaVersion = settingsDir.resolve(".java-version").readText().trim().removePrefix("1.")
-        dependencyResolutionManagement.versionCatalogs.maybeCreate("libs").version("java", javaVersion)
+        val javaVersion = settingsDir.resolve(".java-version")
+            .readText()
+            .trim()
+            .removePrefix("1.")
+        dependencyResolutionManagement.versionCatalogs
+            .maybeCreate("libs")
+            .version("java", javaVersion)
     } catch (e: IOException) {
-        logger.warn("Could not find/read '.java-version' file.", e)
+        val message = "Could not find/read '.java-version' file."
+        if (logger.isDebugEnabled) logger.warn(message, e) else logger.warn(message)
     }
 }
 
