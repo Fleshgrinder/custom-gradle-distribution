@@ -26,6 +26,7 @@ tasks {
     outputDir.finalizeValue()
 
     val compileGradleDistribution by registering {
+        group = "gradle distribution"
         val zip = config.incoming.artifacts.resolvedArtifacts.map { it.single().file }
         val init = projectDir.file("src/main/kotlin/fleshgrinder.init.gradle.kts")
         val properties = projectDir.file("src/main/resources/gradle.properties")
@@ -47,6 +48,7 @@ tasks {
     }
 
     val assembleGradleDistribution by registering(Zip::class) {
+        group = "gradle distribution"
         from(compileGradleDistribution.map { it.outputs.files.single() })
         archiveFileName.set("gradle.zip")
         destinationDirectory.set(outputDir)
