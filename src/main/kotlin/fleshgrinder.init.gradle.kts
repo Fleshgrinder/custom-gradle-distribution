@@ -102,7 +102,7 @@ beforeProject {
         withType<Test>().configureEach {
             systemProperty("java.io.tmpdir", temporaryDir.absolutePath)
             testLogging.apply {
-                events(TestLogEvent.SKIPPED, TestLogEvent.PASSED)
+                events(TestLogEvent.FAILED, TestLogEvent.SKIPPED)
                 showCauses = true
                 showExceptions = true
                 showStackTraces = true
