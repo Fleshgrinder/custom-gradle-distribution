@@ -4,26 +4,53 @@ import org.gradle.api.internal.GradleInternal
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.gradle.kotlin.dsl.support.serviceOf
 
-// https://github.com/gradle/gradle/issues/12388
-@Suppress("NOTHING_TO_INLINE")
-inline fun <T : Any> T?.sneakyNull(): T = this as T
+val gradle: GradleInternal = getGradle() as GradleInternal
+val rootDir: File = gradle.owner.buildRootDir
+val objects: ObjectFactory = gradle.serviceOf()
+val providers: ProviderFactory = gradle.serviceOf()
 
-val objects: ObjectFactory = serviceOf()
-val providers: ProviderFactory = serviceOf()
-val javaVersion = (gradle as GradleInternal)
-    .root
-    .owner
-    .buildRootDir
-    .let(objects.fileProperty()::fileValue)
-    .let(providers::fileContents)
-    .asText
-    .map { it.trim().removePrefix("1.").substringBefore('.').ifBlank { null }.sneakyNull() }
+val javaVersion: String? = when {
+    // The environment variable provides the ability to test building the
+    // project with a different Java version other than the one in the
+    // `.java-version` file. This is useful in matrix builds.
+    //
+    // We have to resolve the file contents provider right away, to ensure that
+    // it becomes an input of the configuration model. Not doing so would mean
+    // that changes to the file are not picked up whenever configuration
+    // caching is active. The file contents provider is also live, meaning, if
+    // we use it in multiple places we might end up reading the file over and
+    // over again, and even with different content at different stages. We do
+    // not want that. Whatever Java version we find at the beginning of the
+    // build is the Java version we use throughout the entire build.
+    gradle.isRootBuild -> providers.environmentVariable("JAVA_VERSION")
+        .orElse(
+            rootDir.resolve(".java-version")
+                .let(objects.fileProperty()::fileValue)
+                .let(providers::fileContents)
+                .asText
+        )
+        .orNull
+        ?.trim()
+        ?.removePrefix("1.")
+        ?.substringBefore('.')
+        ?.ifBlank { null }
+        .also {
+            when {
+                it == null -> logger.warn("Could not find '.java-version' file in: {}", rootDir)
+                logger.isInfoEnabled -> logger.info("Resolved {} from '.java-version' file in: {}", it, rootDir)
+            }
+        }
+
+    else -> gradle.root.settings.extra["javaVersion"] as String?
+}
 
 beforeSettings {
-    dependencyResolutionManagement.versionCatalogs {
-        (if ("libs" in names) named("libs") else register("libs")).configure {
-            javaVersion.orNull?.let { version("java", it) }
-        }
+    // We store the resolved version in the extra properties so that we can
+    // retrieve it in included builds, without resolving it again.
+    extra["javaVersion"] = javaVersion
+
+    if (javaVersion != null) {
+        dependencyResolutionManagement.versionCatalogs.maybeCreate("libs").version("java", javaVersion)
     }
 }
 
@@ -38,7 +65,9 @@ beforeProject {
                     useCompileClasspathVersions()
                 }
 
-                toolchain.languageVersion.set(javaVersion.map(JavaLanguageVersion::of))
+                if (javaVersion != null) {
+                    toolchain.languageVersion.set(JavaLanguageVersion.of(javaVersion))
+                }
 
                 withPlugin("maven-publish") {
                     withJavadocJar()
